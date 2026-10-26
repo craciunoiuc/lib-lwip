@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -40,6 +41,14 @@ out:
 	return *srv < 0 ? -1 : 0;
 }
 
+static ssize_t test_read_eof(int cli, int srv)
+{
+	char c;
+
+	close(cli);
+	return read(srv, &c, 1);
+}
+
 UK_TESTCASE(lwip_sockets, read_at_eof_keeps_errno)
 {
 	int cli, srv;
@@ -54,6 +63,43 @@ UK_TESTCASE(lwip_sockets, read_at_eof_keeps_errno)
 
 	UK_TEST_EXPECT_SNUM_EQ(n, 0);
 	UK_TEST_EXPECT_SNUM_EQ(errno, EDOM);
+
+	close(srv);
+}
+
+UK_TESTCASE(lwip_sockets, socket_at_eof_is_readable)
+{
+	struct pollfd p;
+	int cli, srv;
+
+	UK_TEST_ASSERT(test_connect(TEST_PORT + 1, &cli, &srv) == 0);
+	UK_TEST_EXPECT_SNUM_EQ(test_read_eof(cli, srv), 0);
+
+	p = (struct pollfd){ .fd = srv, .events = POLLIN | POLLRDHUP };
+	UK_TEST_EXPECT_SNUM_EQ(poll(&p, 1, 0), 1);
+	UK_TEST_EXPECT(p.revents & POLLIN);
+	UK_TEST_EXPECT(p.revents & POLLRDHUP);
+
+	close(srv);
+}
+
+UK_TESTCASE(lwip_sockets, reset_socket_reports_err_and_hup)
+{
+	struct pollfd p;
+	int cli, srv;
+
+	UK_TEST_ASSERT(test_connect(TEST_PORT + 2, &cli, &srv) == 0);
+	UK_TEST_EXPECT_SNUM_EQ(test_read_eof(cli, srv), 0);
+
+	UK_TEST_EXPECT_SNUM_EQ(write(srv, "x", 1), 1);
+	p = (struct pollfd){ .fd = srv, .events = 0 };
+	UK_TEST_EXPECT_SNUM_EQ(poll(&p, 1, 1000), 1);
+
+	p = (struct pollfd){ .fd = srv, .events = POLLIN | POLLOUT };
+	UK_TEST_EXPECT_SNUM_EQ(poll(&p, 1, 0), 1);
+	UK_TEST_EXPECT(p.revents & POLLERR);
+	UK_TEST_EXPECT(p.revents & POLLHUP);
+	UK_TEST_EXPECT(p.revents & POLLIN);
 
 	close(srv);
 }
