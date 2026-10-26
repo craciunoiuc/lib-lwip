@@ -278,15 +278,18 @@ lwip_posix_socket_recvfrom(posix_sock *file, void *restrict buf,
 {
 	int lwip_fd;
 	ssize_t ret;
+	int err;
 
 	flags = _lwip_ignore_noncrit_msgflags(flags);
 
 	lwip_fd = _lwip_getfd(file);
 	UK_ASSERT(lwip_fd >= 0);
 
+	err = errno;
 	ret = lwip_recvfrom(lwip_fd, buf, len, flags, from, fromlen);
 	if (unlikely(ret < 0))
 		ret = -errno;
+	errno = err;
 
 	return ret;
 }
@@ -297,15 +300,18 @@ lwip_posix_socket_recvmsg(posix_sock *file, struct msghdr *msg,
 {
 	int lwip_fd;
 	ssize_t ret;
+	int err;
 
 	flags = _lwip_ignore_noncrit_msgflags(flags);
 
 	lwip_fd = _lwip_getfd(file);
 	UK_ASSERT(lwip_fd >= 0);
 
+	err = errno;
 	ret = lwip_recvmsg(lwip_fd, msg, flags);
 	if (unlikely(ret < 0))
 		ret = -errno;
+	errno = err;
 
 	return ret;
 }
@@ -356,13 +362,16 @@ lwip_posix_socket_read(posix_sock *file, const struct iovec *iov,
 {
 	int lwip_fd;
 	ssize_t ret;
+	int err;
 
 	lwip_fd = _lwip_getfd(file);
 	UK_ASSERT(lwip_fd >= 0);
 
+	err = errno;
 	ret = lwip_readv(lwip_fd, iov, iovcnt);
 	if (unlikely(ret < 0))
 		ret = -errno;
+	errno = err;
 
 	return ret;
 }
